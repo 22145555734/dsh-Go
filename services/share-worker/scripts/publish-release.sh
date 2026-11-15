@@ -456,6 +456,8 @@ if [[ $GITHUB == 1 ]]; then
       have=$(jq -r --arg n "$name" '[.assets[] | select(.name == $n) | .size][0] // empty' <<<"$info")
       digest=$(jq -r --arg n "$name" '[.assets[] | select(.name == $n) | .digest][0] // empty' <<<"$info")
       if [[ -z "$have" ]]; then missing+=("$path")
+      elif [[ $GH_DRAFT == 0 && -n "${SHA[$name]:-}" && -z "$digest" ]]; then
+        die "$TAG: GitHub gives no digest for the published $name, so it can't be checked before update.json is replaced"
       elif [[ $GH_DRAFT == 0 && $name == update.json ]]; then
         # update.json only carries metadata (notes, routes): a published release always takes the current one.
         replace+=("$path")
