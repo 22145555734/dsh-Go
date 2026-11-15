@@ -454,10 +454,14 @@ if [[ $GITHUB == 1 ]]; then
     for path in "${GH_PATHS[@]}"; do
       name=$(basename "$path")
       have=$(jq -r --arg n "$name" '[.assets[] | select(.name == $n) | .size][0] // empty' <<<"$info")
+      digest=$(jq -r --arg n "$name" '[.assets[] | select(.name == $n) | .digest][0] // empty' <<<"$info")
       if [[ -z "$have" ]]; then missing+=("$path")
-      elif [[ "$have" != "$(stat -c %s "$path")" ]]; then
-        # update.json only carries metadata (notes, routes), so a published release may take a corrected one.
-        [[ $GH_DRAFT == 1 || $name == update.json ]] || die "$TAG is published with another $name; publish a new version"
+      elif [[ $GH_DRAFT == 0 && $name == update.json ]]; then
+        # update.json only carries metadata (notes, routes): a published release always takes the current one.
+        replace+=("$path")
+      elif [[ "$have" != "$(stat -c %s "$path")" ]] ||
+           [[ $GH_DRAFT == 0 && -n "${SHA[$name]:-}" && -n "$digest" && "$digest" != "sha256:${SHA[$name]}" ]]; then
+        [[ $GH_DRAFT == 1 ]] || die "$TAG is published with another $name; publish a new version"
         replace+=("$path")
       else note "already there: $name"
       fi
