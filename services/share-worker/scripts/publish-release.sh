@@ -62,6 +62,8 @@
 # jq, curl, python3; rclone for resumable R2 uploads (else wrangler); ossutil /
 # coscli; gh.
 set -euo pipefail
+# Python's stdio defaults to the ANSI code page on Windows (GBK here); 1.1.0's Chinese notes came out garbled.
+export PYTHONUTF8=1
 
 usage() {
   echo "usage: CF_TOKEN_FILE=<file> $0 <dist dir> [--dry-run] [--github] [--no-dl] [--no-cn] [--no-latest] [--skip-verify]" >&2
@@ -454,13 +456,16 @@ if [[ $GITHUB == 1 ]]; then
       have=$(jq -r --arg n "$name" '[.assets[] | select(.name == $n) | .size][0] // empty' <<<"$info")
       if [[ -z "$have" ]]; then missing+=("$path")
       elif [[ "$have" != "$(stat -c %s "$path")" ]]; then
-        [[ $GH_DRAFT == 1 ]] || die "$TAG is published with another $name; publish a new version"
+        # update.json only carries metadata (notes, routes), so a published release may take a corrected one.
+        [[ $GH_DRAFT == 1 || $name == update.json ]] || die "$TAG is published with another $name; publish a new version"
         replace+=("$path")
       else note "already there: $name"
       fi
     done
     if ((${#missing[@]})); then run_gh release upload "$TAG" "${missing[@]}" --repo "$REPO" || die "gh release upload failed"; fi
     if ((${#replace[@]})); then run_gh release upload "$TAG" "${replace[@]}" --repo "$REPO" --clobber || die "gh release upload failed"; fi
+    # Rerunning on a published release refreshes its notes from the changelog.
+    if [[ $GH_DRAFT == 0 ]]; then run_gh release edit "$TAG" --repo "$REPO" --notes-file "$TMP/gh-notes.md" >/dev/null || die "updating the release notes failed"; fi
   fi
 fi
 
