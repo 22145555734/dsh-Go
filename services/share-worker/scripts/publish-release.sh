@@ -457,7 +457,7 @@ if [[ $GITHUB == 1 ]]; then
       digest=$(jq -r --arg n "$name" '[.assets[] | select(.name == $n) | .digest][0] // empty' <<<"$info")
       if [[ -z "$have" ]]; then missing+=("$path")
       elif [[ $GH_DRAFT == 0 && -n "${SHA[$name]:-}" && -z "$digest" ]]; then
-        die "$TAG: GitHub gives no digest for the published $name, so it can't be checked before update.json is replaced"
+        die "$TAG: no digest for the published $name, so it can't be checked before update.json is replaced (older gh such as 2.65 leaves asset digests out of \`release view --json assets\`: upgrade gh)"
       elif [[ $GH_DRAFT == 0 && $name == update.json ]]; then
         # update.json only carries metadata (notes, routes): a published release always takes the current one.
         replace+=("$path")
