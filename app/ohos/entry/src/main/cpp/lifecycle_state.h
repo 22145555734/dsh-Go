@@ -9,7 +9,13 @@ namespace dsh {
 // BOOTTIME includes suspend. Failure never falls back to wall/active/process time.
 inline int64_t LifecycleBootTimeMs() noexcept {
   timespec value{};
-  if (clock_gettime(CLOCK_BOOTTIME, &value) != 0 || value.tv_sec < 0 ||
+#if defined(__APPLE__)
+  // Darwin has no CLOCK_BOOTTIME; its CLOCK_MONOTONIC keeps counting while asleep.
+  constexpr clockid_t kBootClock = CLOCK_MONOTONIC;
+#else
+  constexpr clockid_t kBootClock = CLOCK_BOOTTIME;
+#endif
+  if (clock_gettime(kBootClock, &value) != 0 || value.tv_sec < 0 ||
       value.tv_nsec < 0 || value.tv_nsec >= 1000000000 ||
       value.tv_sec > (9007199254740991LL - 999) / 1000) return -1;
   return value.tv_sec * 1000LL + value.tv_nsec / 1000000;

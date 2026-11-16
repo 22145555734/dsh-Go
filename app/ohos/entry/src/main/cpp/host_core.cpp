@@ -263,6 +263,8 @@ void Host::Start(HostOptions options, StartNode start_node, StopNode stop_node) 
   options.dsh_home = Directory(options.dsh_home);
   options.cache_dir = Directory(options.cache_dir);
   options.native_library_dir = NativeDirectory(options.native_library_dir);
+#if !defined(DSH_IOS_HOST)
+  // HarmonyOS's own Linux. iOS has its own guest and no such directory.
   Require(Directory(options.linux_directory, "ERR_OHOS_LINUX_DIRECTORY") == options.linux_directory,
           "ERR_OHOS_LINUX_DIRECTORY", "Linux data must not be redirected by symlinks");
   for (const auto& root : {options.runtime_root, options.guest_root}) {
@@ -270,6 +272,7 @@ void Host::Start(HostOptions options, StartNode start_node, StopNode stop_node) 
                 root.rfind(options.linux_directory + "/", 0) != 0,
             "ERR_OHOS_LINUX_DIRECTORY", "Linux data must be separate from the runtime and host workspace");
   }
+#endif
   Require(options.workspace_roots.size() == 1, "ERR_OHOS_HOST_WORKSPACES", "The single authorized guest workspace is required");
   for (auto& root : options.workspace_roots) root = Directory(root);
   const auto user_home = options.guest_root + "/root";
@@ -296,7 +299,10 @@ void Host::Start(HostOptions options, StartNode start_node, StopNode stop_node) 
   File(options.runtime_root, "runtime/ohos/process/index.mjs");
   File(options.runtime_root, "runtime/ohos/process/sandbox.mjs");
   File(options.runtime_root, "runtime/ohos/lifecycle/index.mjs");
+#if !defined(DSH_IOS_HOST)
+  // iOS registers its own phone tools (dsh-go-ios-phone) from the app.
   File(options.runtime_root, "runtime/ohos/phone/index.mjs");
+#endif
   File(options.runtime_root, "runtime/ohos/capabilities/index.mjs");
   File(options.runtime_root, "runtime/bridge/dsh-go-bridge/lib/index.js");
   File(options.runtime_root, "runtime/ohos/process/child-process.mjs");
@@ -341,6 +347,12 @@ void Host::Run(HostOptions options, StartNode start_node) {
     const std::string profile = options.dsh_home + "/ohos-host.patch.json";
     const std::string safe_patch = options.safe_mode
         ? "{\"id\":\"hmr\",\"disabled\":true}," : "";
+#if defined(DSH_IOS_HOST)
+    const std::string phone_plugin;
+#else
+    const std::string phone_plugin =
+        "{\"id\":\"ohos-phone\",\"name\":" + Json(File(options.runtime_root, "runtime/ohos/phone/index.mjs")) + "},";
+#endif
     WriteProfile(profile, "[" + safe_patch + "{\"id\":\"subprocess\",\"disabled\":true},{\"id\":\"sandbox\",\"disabled\":true},"
         "{\"id\":\"working-directory\",\"config\":{\"defaultDirectory\":" + Json(options.workspace_roots[0]) + "}},"
         "{\"id\":\"sandbox-policy\",\"config\":{\"mode\":" + Json(mode) + ",\"workspaceRoot\":" + Json(options.workspace_roots[0]) + "}},"
@@ -348,7 +360,7 @@ void Host::Run(HostOptions options, StartNode start_node) {
         ",\"config\":{\"workspaceRoots\":[" + roots + "],\"temporaryRoot\":" + Json(temporary) + "}},"
         "{\"id\":\"ohos-sandbox\",\"name\":" + Json(File(options.runtime_root, "runtime/ohos/process/sandbox.mjs")) + "},"
         "{\"id\":\"ohos-lifecycle\",\"name\":" + Json(File(options.runtime_root, "runtime/ohos/lifecycle/index.mjs")) + "},"
-        "{\"id\":\"ohos-phone\",\"name\":" + Json(File(options.runtime_root, "runtime/ohos/phone/index.mjs")) + "},"
+        + phone_plugin +
         "{\"id\":\"ohos-capabilities\",\"name\":" + Json(File(options.runtime_root, "runtime/ohos/capabilities/index.mjs")) + "},"
         "{\"id\":\"dsh-go-bridge\",\"name\":" + Json(File(options.runtime_root, "runtime/bridge/dsh-go-bridge/lib/index.js")) + "}]}]\n");
     int code;
@@ -362,7 +374,9 @@ void Host::Run(HostOptions options, StartNode start_node) {
       environment.Set("NODE_COMPILE_CACHE", cache);
       environment.Set("NARB_DISABLE_NATIVE_CACHE", "1");
       environment.Set("DSH_GO_OHOS_NATIVE_LIBRARY_DIR", options.native_library_dir);
+#if !defined(DSH_IOS_HOST)
       environment.Set("DSH_GO_OHOS_LINUX_DIRECTORY", options.linux_directory);
+#endif
       environment.Set("DSH_PERMISSION_MODE", mode);
       std::vector<std::string> argv{"dsh-node", "--jitless", "--import",
         File(options.runtime_root, "runtime/ohos/preload.mjs"),
