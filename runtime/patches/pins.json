@@ -2488,7 +2488,8 @@
       "config-editor-lock-order.diff",
       "piai-overflow-output-limit.diff",
       "schedule-authorization-availability.diff",
-      "deepseek-refusal.diff"
+      "deepseek-refusal.diff",
+      "deepseek-unnamed-stream-error.diff"
     ],
     "ohos": [
       "cordis-effect-dispose-completion.diff",
@@ -2642,6 +2643,7 @@
       "piai-overflow-output-limit.diff",
       "schedule-authorization-availability.diff",
       "deepseek-refusal.diff",
+      "deepseek-unnamed-stream-error.diff",
       "ohos-attachment-publication.diff",
       "ohos-attachment-diagnostic.diff",
       "ohos-hap-native-libraries.diff",
