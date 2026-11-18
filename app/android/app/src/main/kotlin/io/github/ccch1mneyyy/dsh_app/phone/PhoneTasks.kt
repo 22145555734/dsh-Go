@@ -93,7 +93,10 @@ class PhoneTasks(
             if (expectedEpoch != null && expectedEpoch != admissionEpoch) return Begin.Refused(STOPPED_MESSAGE)
             val now = clock()
             if (now < stoppedUntil) {
-                stoppedUntil = now + stopHoldMs
+                // A person's stop covers the turn it interrupted; retries within it renew that hold.
+                // An ambient stop (service loss / screen off) must expire on its own: a retry storm
+                // after the system recovered used to renew it forever and lock phone control.
+                if (stopSource == StopSource.USER) stoppedUntil = now + stopHoldMs
                 return Begin.Refused(if (stopSource == StopSource.USER) STOPPED_MESSAGE else ENV_STOPPED_MESSAGE)
             }
             interrupted = false
@@ -379,6 +382,20 @@ class PhoneTasks(
         if (taskId != snapshot.id || lifecycle != snapshot.lifecycle || active) return false
         action()
         true
+    }
+
+    /** The environment that interrupted a turn is back (the accessibility service reconnected):
+     * opening the next turn again. A person's own stop and a screen-off hold are left alone. */
+    fun clearAmbientStop() {
+        synchronized(lock) {
+            if (stopSource != StopSource.ENVIRONMENT) return
+            lifecycle++
+            stoppedUntil = 0L
+            stopReason = null
+            stopSource = null
+            interrupted = false
+        }
+        fire()
     }
 
     /** Clears a stop early (e.g. the person turned phone control off and on again). */

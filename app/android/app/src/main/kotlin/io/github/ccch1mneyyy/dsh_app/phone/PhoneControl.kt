@@ -945,7 +945,12 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
 
     override fun onStopAllRequested(reason: String, source: PhoneTasks.StopSource) { shell.cancelAll(); selfCheck.stop(); sessions.stopAll(reason, source) }
 
-    override fun onAccessibilityChanged(connected: Boolean) = emitStatus()
+    override fun onAccessibilityChanged(connected: Boolean) {
+        // The system took the service away, which stopped the turns that were running. Once it is
+        // back (the service reconnected), those ambient holds must not outlive the interruption.
+        if (connected) sessions.clearAmbientStops()
+        emitStatus()
+    }
 
     // ── PhoneEnv ────────────────────────────────────────────────────────────────────
 

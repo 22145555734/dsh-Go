@@ -524,6 +524,10 @@ class PhoneTaskSessions(
 
     fun task(taskId: Long): Task? = all().firstOrNull { it.tasks.snapshot().id == taskId }
     fun all(): List<Task> = synchronized(lock) { entries.values.toList() }
+
+    /** The accessibility service reconnected after interrupting turns: let the next turn run.
+     * Explicit stops (the person, or screen off) keep their hold. */
+    fun clearAmbientStops() = all().forEach { it.tasks.clearAmbientStop() }
     fun isBusy(task: Task): Boolean = synchronized(lock) { task.pending > 0 || task.running || task.closing || task.cancelling || task.cleanupFailed }
 
     /** Policy validation and in-memory publication share admission's linearization point.
